@@ -4,9 +4,9 @@ from flask import Flask, request
 import telebot
 from telebot import types
 
-# Переменные окружения
 TOKEN = os.getenv("TOKEN")
 HF_API_KEY = os.getenv("HF_API_KEY")
+RENDER_HOSTNAME = os.getenv("RENDER_EXTERNAL_HOSTNAME")
 
 bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
@@ -21,17 +21,13 @@ HF_MODELS = [
     "mistralai/Mistral-7B-Instruct-v0.1"
 ]
 
-# Функция для запроса к Hugging Face с фолбэком
+# Функция обращения к Hugging Face
 def ask_model(prompt):
     headers = {"Authorization": f"Bearer {HF_API_KEY}"}
     for model in HF_MODELS:
         try:
-            response = requests.post(
-                f"https://api-inference.huggingface.co/models/{model}",
-                headers=headers,
-                json={"inputs": prompt},
-                timeout=30
-            )
+            url = f"https://api-inference.huggingface.co/models/{model}"
+            response = requests.post(url, headers=headers, json={"inputs": prompt}, timeout=30)
             if response.status_code == 200:
                 result = response.json()
                 if isinstance(result, list) and "generated_text" in result[0]:
@@ -39,18 +35,14 @@ def ask_model(prompt):
                 elif isinstance(result, dict):
                     return result.get("generated_text") or result.get("summary_text")
             elif response.status_code == 503:
-                print(f"Модель {model} не активна. Пробую следующую...")
-                continue
-            else:
-                print(f"Ответ {response.status_code} от модели {model}: {response.text}")
+                continue  # модель пока неактивна
         except Exception as e:
-            print(f"Ошибка при обращении к модели {model}: {e}")
+            print(f"[Ошибка модели {model}] {e}")
     return "Извините, сейчас не могу ответить. Попробуйте позже."
 
 @app.route(f"/{TOKEN}", methods=["POST"])
 def receive_update():
-    json_str = request.get_data().decode("utf-8")
-    update = types.Update.de_json(json_str)
+    update = types.Update.de_json(request.get_data().decode("utf-8"))
     bot.process_new_updates([update])
     return "OK", 200
 
@@ -58,25 +50,27 @@ def receive_update():
 def index():
     return "Бот запущен!"
 
-@app.route("/set_webhook", methods=["GET"])
-def set_webhook():
-    webhook_url = f"https://{os.getenv('RENDER_EXTERNAL_HOSTNAME')}/{TOKEN}"
-    success = bot.set_webhook(url=webhook_url)
-    return "Webhook установлен" if success else "Ошибка установки вебхука", 200
+# Устанавливаем вебхук при запуске
+@app.before_first_request
+def setup_webhook():
+    if RENDER_HOSTNAME:
+        webhook_url = f"https://{RENDER_HOSTNAME}/{TOKEN}"
+        success = bot.set_webhook(url=webhook_url)
+        print("Webhook установлен" if success else "Ошибка установки вебхука")
 
 @bot.message_handler(commands=["start", "help"])
 def send_welcome(message):
     bot.send_message(message.chat.id, "Привет! Я бот для записи на маникюр и общения. Можешь спросить что угодно!")
 
 @bot.message_handler(func=lambda msg: True)
-def handle_message(message):
-    user_text = message.text.strip().lower()
-    if "цены" in user_text:
-        bot.send_message(message.chat.id, "Маникюр — 1500 руб, педикюр — 2000 руб. Записаться?")
-    elif "расписание" in user_text:
-        bot.send_message(message.chat.id, "Свободные окна: завтра 13:00, пятница 16:30.")
-    elif "записаться" in user_text:
-        bot.send_message(message.chat.id, "Напиши дату и время, я запишу тебя!")
+def handle_text(message):
+    text = message.text.lower()
+    if "цены" in text:
+        bot.send_message(message.chat.id, "Маникюр — 1500 руб, педикюр — 2000 руб.")
+    elif "расписание" in text:
+        bot.send_message(message.chat.id, "Свободно завтра в 13:00 и в пятницу в 16:30.")
+    elif "записаться" in text:
+        bot.send_message(message.chat.id, "Напиши дату и время, я тебя запишу.")
     else:
         reply = ask_model(message.text)
         bot.send_message(message.chat.id, reply)
