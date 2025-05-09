@@ -4,9 +4,11 @@ from flask import Flask, request
 import telebot
 from telebot import types
 
+# Переменные окружения
 TOKEN = os.getenv("TOKEN")
-bot = telebot.TeleBot(TOKEN)
+HF_API_KEY = os.getenv("HF_API_KEY")
 
+bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
 
 # Список fallback моделей Hugging Face
@@ -19,9 +21,9 @@ HF_MODELS = [
     "mistralai/Mistral-7B-Instruct-v0.1"
 ]
 
-# Функция-запрос с фоллбэком на разные модели
+# Функция для запроса к Hugging Face с фолбэком
 def ask_model(prompt):
-    headers = {"Authorization": f"Bearer {os.getenv('HF_API_TOKEN')}"}
+    headers = {"Authorization": f"Bearer {HF_API_KEY}"}
     for model in HF_MODELS:
         try:
             response = requests.post(
@@ -34,12 +36,13 @@ def ask_model(prompt):
                 result = response.json()
                 if isinstance(result, list) and "generated_text" in result[0]:
                     return result[0]["generated_text"]
-                elif isinstance(result, dict) and result.get("generated_text"):
-                    return result["generated_text"]
-                elif isinstance(result, dict) and result.get("summary_text"):
-                    return result["summary_text"]
+                elif isinstance(result, dict):
+                    return result.get("generated_text") or result.get("summary_text")
             elif response.status_code == 503:
-                continue  # модель пока неактивна
+                print(f"Модель {model} не активна. Пробую следующую...")
+                continue
+            else:
+                print(f"Ответ {response.status_code} от модели {model}: {response.text}")
         except Exception as e:
             print(f"Ошибка при обращении к модели {model}: {e}")
     return "Извините, сейчас не могу ответить. Попробуйте позже."
