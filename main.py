@@ -40,3 +40,7 @@ import requests
 
 WEBHOOK_URL = "https://nailbot-service.onrender.com/" + TOKEN
 requests.get(f"https://api.telegram.org/bot{TOKEN}/setWebhook?url={WEBHOOK_URL}")
+@app.route("/set_webhook")
+def set_webhook():
+    s = bot.set_webhook(url="https://nailbot-service.onrender.com/" + TOKEN)
+    return "Webhook set" if s else "Webhook failed"
