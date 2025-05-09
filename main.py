@@ -1,10 +1,12 @@
 
-from flask import Flask, request
-from telebot import TeleBot, types
 import os
+from flask import Flask, request
+import telebot
+from telebot import types
 
-TOKEN = os.environ.get("TELEGRAM_TOKEN")
-bot = TeleBot(TOKEN)
+TOKEN = os.getenv("TOKEN")  # Убедись, что переменная TOKEN добавлена в Render
+bot = telebot.TeleBot(TOKEN)
+
 app = Flask(__name__)
 
 @app.route(f"/{TOKEN}", methods=["POST"])
@@ -18,7 +20,13 @@ def receive_update():
 def index():
     return "Бот запущен!"
 
-@bot.message_handler(commands=['start', 'help'])
+@app.route("/set_webhook", methods=["GET"])
+def set_webhook():
+    webhook_url = f"https://nailbot-service.onrender.com/{TOKEN}"
+    success = bot.set_webhook(url=webhook_url)
+    return "Webhook установлен" if success else "Ошибка установки вебхука", 200
+
+@bot.message_handler(commands=["start", "help"])
 def send_welcome(message):
     bot.send_message(message.chat.id, "Привет! Я бот для записи на маникюр и педикюр.")
 
