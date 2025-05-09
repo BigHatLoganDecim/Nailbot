@@ -6,11 +6,11 @@ from telebot import types
 
 TOKEN = os.getenv("TOKEN")
 HF_API_KEY = os.getenv("HF_API_KEY")
-RENDER_HOST = os.getenv("RENDER_EXTERNAL_HOSTNAME")
 
 bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
 
+# fallback-модели Hugging Face
 HF_MODELS = [
     "tiiuae/falcon-rw-1b",
     "google/flan-t5-base",
@@ -20,6 +20,7 @@ HF_MODELS = [
     "mistralai/Mistral-7B-Instruct-v0.1"
 ]
 
+# функция запроса к модели
 def ask_model(prompt):
     headers = {"Authorization": f"Bearer {HF_API_KEY}"}
     for model in HF_MODELS:
@@ -35,19 +36,12 @@ def ask_model(prompt):
                 if isinstance(result, list) and "generated_text" in result[0]:
                     return result[0]["generated_text"]
                 elif isinstance(result, dict):
-                    return result.get("generated_text") or result.get("summary_text") or ""
+                    return result.get("generated_text") or result.get("summary_text")
             elif response.status_code == 503:
-                continue  # модель недоступна
+                continue
         except Exception as e:
-            print(f"Модель {model} вызвала ошибку: {e}")
+            print(f"Ошибка модели {model}: {e}")
     return "Извините, сейчас не могу ответить. Попробуйте позже."
-
-@app.before_first_request
-def set_webhook_on_start():
-    if RENDER_HOST:
-        full_url = f"https://{RENDER_HOST}/{TOKEN}"
-        success = bot.set_webhook(url=full_url)
-        print(f"Webhook установлен: {success}")
 
 @app.route(f"/{TOKEN}", methods=["POST"])
 def receive_update():
@@ -58,21 +52,27 @@ def receive_update():
 
 @app.route("/")
 def index():
-    return "Бот успешно работает!"
+    return "Бот запущен!"
+
+@app.route("/set_webhook", methods=["GET"])
+def set_webhook():
+    webhook_url = f"https://nailbot-service.onrender.com/{TOKEN}"
+    success = bot.set_webhook(url=webhook_url)
+    return "Webhook установлен" if success else "Ошибка установки вебхука", 200
 
 @bot.message_handler(commands=["start", "help"])
-def greet(message):
+def send_welcome(message):
     bot.send_message(message.chat.id, "Привет! Я бот для записи на маникюр и общения. Можешь спросить что угодно!")
 
 @bot.message_handler(func=lambda msg: True)
 def handle_message(message):
-    text = message.text.lower()
-    if "цены" in text:
-        bot.send_message(message.chat.id, "Маникюр — 1500 руб, педикюр — 2000 руб. Записаться?")
-    elif "расписание" in text:
-        bot.send_message(message.chat.id, "Свободно: завтра в 13:00, пятница — 16:30.")
-    elif "записаться" in text:
-        bot.send_message(message.chat.id, "Напиши желаемую дату и время, и я тебя запишу!")
+    user_text = message.text.lower()
+    if "цены" in user_text:
+        bot.send_message(message.chat.id, "Маникюр — 1500 руб, педикюр — 2000 руб.")
+    elif "расписание" in user_text:
+        bot.send_message(message.chat.id, "Свободные окна: завтра 13:00, пятница 16:30.")
+    elif "записаться" in user_text:
+        bot.send_message(message.chat.id, "Напиши дату и время — и я запишу тебя.")
     else:
         reply = ask_model(message.text)
         bot.send_message(message.chat.id, reply)
