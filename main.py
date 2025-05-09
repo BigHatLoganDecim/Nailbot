@@ -36,3 +36,7 @@ def fallback(message):
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
+import requests
+
+WEBHOOK_URL = "https://nailbot-service.onrender.com/" + TOKEN
+requests.get(f"https://api.telegram.org/bot{TOKEN}/setWebhook?url={WEBHOOK_URL}")
