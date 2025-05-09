@@ -1,10 +1,9 @@
-
 import os
 from flask import Flask, request
 import telebot
 from telebot import types
 
-TOKEN = os.getenv("TOKEN")  # Убедись, что переменная TOKEN добавлена в Render
+TOKEN = os.getenv("TOKEN")  # Убедись, что переменная TOKEN есть в Render
 bot = telebot.TeleBot(TOKEN)
 
 app = Flask(__name__)
@@ -35,12 +34,6 @@ def fallback(message):
     bot.send_message(message.chat.id, "Напиши: /start, 'цены', 'расписание' или 'записаться'.")
 
 if __name__ == "__main__":
+    # Настрой вебхук один раз вручную через браузер:
+    # https://nailbot-service.onrender.com/set_webhook
     app.run(host="0.0.0.0", port=5000)
-import requests
-
-WEBHOOK_URL = "https://nailbot-service.onrender.com/" + TOKEN
-requests.get(f"https://api.telegram.org/bot{TOKEN}/setWebhook?url={WEBHOOK_URL}")
-@app.route("/set_webhook")
-def set_webhook():
-    s = bot.set_webhook(url="https://nailbot-service.onrender.com/" + TOKEN)
-    return "Webhook set" if s else "Webhook failed"
