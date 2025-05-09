@@ -1,3 +1,6 @@
 Flask
 pyTelegramBotAPI
 requests
+gspread
+oauth2client
+pytz
